@@ -1,5 +1,20 @@
 Proxy server listening on port 8000
-Accepted connection from 127.0.0.1:33136
+Accepted connection from 127.0.0.1:32856
+Client closed connection
 Proxy server listening on port 8000
-Accepted connection from 127.0.0.1:33136
-Accepted connection from 127.0.0.1:33142
+Accepted connection from 127.0.0.1:32856
+Accepted connection from 127.0.0.1:32872
+
+--- Received Request ---
+GET http://netsys.cs.colorado.edu/index.html HTTP/1.1
+Accept-Encoding: identity
+Host: netsys.cs.colorado.edu
+Connection: close
+
+
+-------------------------
+Parsed Request:
+ Host: netsys.cs.colorado.edu
+ Path: /index.html
+ Port: 80
+
