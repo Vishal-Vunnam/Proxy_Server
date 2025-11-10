@@ -1,9 +1,9 @@
 Proxy server listening on port 8000
-Accepted connection from 127.0.0.1:32856
+Accepted connection from 127.0.0.1:50058
 Client closed connection
 Proxy server listening on port 8000
-Accepted connection from 127.0.0.1:32856
-Accepted connection from 127.0.0.1:32872
+Accepted connection from 127.0.0.1:50058
+Accepted connection from 127.0.0.1:50074
 
 --- Received Request ---
 GET http://netsys.cs.colorado.edu/index.html HTTP/1.1
@@ -13,8 +13,98 @@ Connection: close
 
 
 -------------------------
+Request Method: GET, URL: http://netsys.cs.colorado.edu/index.html, Version: HTTP/1.1
 Parsed Request:
  Host: netsys.cs.colorado.edu
  Path: /index.html
  Port: 80
 
+Cache miss for host netsys.cs.colorado.edu
+Forwarding request to netsys.cs.colorado.edu:80/index.html
+Sending response 200 with body length 3629 to client 127.0.0.1:50074
+Cached file ./cache/11568527786186489025 for hostname netsys.cs.colorado.edu
+Blocked access to host: www.google.com
+Proxy server listening on port 8000
+Accepted connection from 127.0.0.1:50058
+Accepted connection from 127.0.0.1:50074
+Accepted connection from 127.0.0.1:50082
+
+--- Received Request ---
+GET http://www.google.com/index.html HTTP/1.1
+Host: www.google.com
+Connection: close
+User-Agent: grading-script
+
+
+-------------------------
+Request Method: GET, URL: http://www.google.com/index.html, Version: HTTP/1.1
+Hostname www.google.com is blocked
+Sending response 403 with body length 44 to client 127.0.0.1:50082
+Invalid or unsupported request format.
+Sending response 400 with body length 39 to client 127.0.0.1:50082
+Blocked access to host: mail.yahoo.com
+Proxy server listening on port 8000
+Accepted connection from 127.0.0.1:50058
+Accepted connection from 127.0.0.1:50074
+Accepted connection from 127.0.0.1:50082
+Accepted connection from 127.0.0.1:50090
+
+--- Received Request ---
+GET http://mail.yahoo.com/index.html HTTP/1.1
+Host: mail.yahoo.com
+Connection: close
+User-Agent: grading-script
+
+
+-------------------------
+Request Method: GET, URL: http://mail.yahoo.com/index.html, Version: HTTP/1.1
+Hostname mail.yahoo.com is blocked
+Sending response 403 with body length 44 to client 127.0.0.1:50090
+Invalid or unsupported request format.
+Sending response 400 with body length 39 to client 127.0.0.1:50090
+Blocked access to host: 157.240.28.35
+Proxy server listening on port 8000
+Accepted connection from 127.0.0.1:50058
+Accepted connection from 127.0.0.1:50074
+Accepted connection from 127.0.0.1:50082
+Accepted connection from 127.0.0.1:50090
+Accepted connection from 127.0.0.1:50098
+
+--- Received Request ---
+GET http://157.240.28.35/index.html HTTP/1.1
+Host: 157.240.28.35
+Connection: close
+User-Agent: grading-script
+
+
+-------------------------
+Request Method: GET, URL: http://157.240.28.35/index.html, Version: HTTP/1.1
+Hostname 157.240.28.35 is blocked
+Sending response 403 with body length 44 to client 127.0.0.1:50098
+Invalid or unsupported request format.
+Sending response 400 with body length 39 to client 127.0.0.1:50098
+Connection to target server failed: Connection refused
+Proxy server listening on port 8000
+Accepted connection from 127.0.0.1:50058
+Accepted connection from 127.0.0.1:50074
+Accepted connection from 127.0.0.1:50082
+Accepted connection from 127.0.0.1:50090
+Accepted connection from 127.0.0.1:50098
+Accepted connection from 127.0.0.1:50106
+
+--- Received Request ---
+GET http://netsys.cs.colorado.edu/index.html HTTP/1.1
+Accept-Encoding: identity
+Host: netsys.cs.colorado.edu
+Connection: close
+
+
+-------------------------
+Request Method: GET, URL: http://netsys.cs.colorado.edu/index.html, Version: HTTP/1.1
+Parsed Request:
+ Host: netsys.cs.colorado.edu
+ Path: /index.html
+ Port: 80
+
+Cache miss for host netsys.cs.colorado.edu
+Forwarding request to netsys.cs.colorado.edu:80/index.html
