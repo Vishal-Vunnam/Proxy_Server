@@ -407,7 +407,6 @@ int prefetch_and_cache_file(req_info *request_info, char *url, char *file_path) 
     char request_buffer[BUFFER_SIZE];
     snprintf(request_buffer, sizeof(request_buffer),
                 "GET %s HTTP/1.1\r\n"
-                "Accept-Encoding: identity\r\n"
                 "Host: %s\r\n"
                 "Connection: close\r\n"
                 "\r\n",
