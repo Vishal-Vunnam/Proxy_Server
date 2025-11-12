@@ -202,7 +202,7 @@ int find_free_entry() {
 
 int cache_file(char *hostname, char *file_path, char *contents, size_t content_size) {
     char hostpath[512]; 
-    snprintf(hostpath, sizeof(hostpath), "%s%s", hostname, file_path);
+    snprintf(hostpath, sizeof(hostpath), "%s/%s", hostname, file_path);
     printf("Caching file for hostpath: %s (size: %zu bytes)\n", hostpath, content_size);
     uint64_t key = generate_key(hostpath);
     int index = key % HASH_TABLE;
