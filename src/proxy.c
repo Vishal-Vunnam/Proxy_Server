@@ -344,8 +344,8 @@ char *get_cached_file(char *hostname, char *file_path) {
         if (entry->key == key && entry->in_use) {
             if (difftime(time(NULL), entry->timestamp) > shared_cache->cache_timeout) {
                 printf("Cache entry for hostname %s has expired\n", hostname);
-                delete_cache_file(hostname, file_path);
                 sem_post(&shared_cache->cache_lock);
+                delete_cache_file(hostname, file_path);
                 return NULL;
             }
             
@@ -392,16 +392,16 @@ int check_cache(char *hostname, char *file_path) {
     
     while (entry_idx != -1) {
         cache_entry_t *entry = &shared_cache->cache_entries[entry_idx];
-        if (entry->key == key && entry->in_use) {
-            if (difftime(now, entry->timestamp) <= shared_cache->cache_timeout) {
-                sem_post(&shared_cache->cache_lock);
-                return 1;
-            } else {
-                // Cache expired
-                sem_post(&shared_cache->cache_lock);
-                return 0;
+            if (entry->key == key && entry->in_use) {
+                if (difftime(now, entry->timestamp) <= shared_cache->cache_timeout) {
+                    sem_post(&shared_cache->cache_lock);
+                    return -1;
+                } else {
+                    // Cache expired
+                    sem_post(&shared_cache->cache_lock);
+                    return 0;
+                }
             }
-        }
         entry_idx = entry->next_index;
     }
 
