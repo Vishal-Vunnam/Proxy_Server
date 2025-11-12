@@ -29,7 +29,8 @@
 typedef struct {
     int portno; 
     char hostname[256];
-    char f_path[512]; 
+    char f_path[512];
+    size_t content_length;  // Add this to track actual size
 } req_info; 
 
 char blocked_hosts[100][256];
@@ -199,7 +200,7 @@ int find_free_entry() {
     return -1;
 }
 
-int cache_file(char *hostname, char *file_path, char *contents) {
+int cache_file(char *hostname, char *file_path, char *contents, size_t content_size) {
     char hostpath[512]; 
     snprintf(hostpath, sizeof(hostpath), "%s%s", hostname, file_path);
     uint64_t key = generate_key(hostpath);
@@ -207,6 +208,7 @@ int cache_file(char *hostname, char *file_path, char *contents) {
 
     sem_wait(&shared_cache->cache_lock);
 
+    // Check if already cached
     int entry_idx = shared_cache->hash_table[index];
     while (entry_idx != -1) {
         if (shared_cache->cache_entries[entry_idx].key == key) {
@@ -224,6 +226,27 @@ int cache_file(char *hostname, char *file_path, char *contents) {
         return -1;
     }
 
+    // Write file BEFORE updating cache metadata
+    char file_name[64];
+    snprintf(file_name, sizeof(file_name), CACHE_DIR "%lu", key);
+    FILE *file = fopen(file_name, "wb");  // Use binary mode
+    if (!file) {
+        sem_post(&shared_cache->cache_lock);
+        perror("Failed to write cache file");
+        return -1;
+    }
+    size_t written = fwrite(contents, 1, content_size, file);
+    fclose(file);
+    
+    if (written != content_size) {
+        sem_post(&shared_cache->cache_lock);
+        fprintf(stderr, "Failed to write complete file (wrote %zu of %zu bytes)\n", 
+                written, content_size);
+        remove(file_name);
+        return -1;
+    }
+
+    // Now update cache metadata atomically
     shared_cache->cache_entries[new_idx].key = key;
     strncpy(shared_cache->cache_entries[new_idx].file_path, file_path, 512);
     shared_cache->cache_entries[new_idx].timestamp = time(NULL);
@@ -232,20 +255,10 @@ int cache_file(char *hostname, char *file_path, char *contents) {
     shared_cache->hash_table[index] = new_idx;
     shared_cache->cached_count++;
 
+    printf("Cached file %s for hostpath %s (key: %lu, size: %zu bytes)\n", 
+           file_name, hostpath, key, content_size);
+    
     sem_post(&shared_cache->cache_lock);
-
-    char file_name[64];
-    snprintf(file_name, sizeof(file_name), CACHE_DIR "%lu", key);
-    FILE *file = fopen(file_name, "w"); 
-    if (file) { 
-        fwrite(contents, sizeof(char), strlen(contents), file);
-        fclose(file);
-        printf("Cached file %s for hostpath %s (key: %lu)\n", file_name, hostpath, key);
-    } else {
-        perror("Failed to write cache file");
-        return -1;
-    }
-
     return 0;
 }
 
@@ -270,19 +283,22 @@ char *get_cached_file(char *hostname, char *file_path) {
             
             char file_name[64];
             snprintf(file_name, sizeof(file_name), CACHE_DIR "%lu", key);
-            FILE *file = fopen(file_name, "r");
+            FILE *file = fopen(file_name, "rb");  // Binary mode
             if (file) {
                 fseek(file, 0, SEEK_END);
                 long file_size = ftell(file);
                 fseek(file, 0, SEEK_SET);
                 
-                char *buffer = malloc(file_size + 1);
-                if (buffer) {
-                    size_t bytes_read = fread(buffer, 1, file_size, file);
-                    buffer[bytes_read] = '\0';
-                    fclose(file);
-                    printf("Retrieved cached file %s for hostname %s\n", file_name, hostname);
-                    return buffer;
+                if (file_size > 0) {
+                    char *buffer = malloc(file_size + 1);
+                    if (buffer) {
+                        size_t bytes_read = fread(buffer, 1, file_size, file);
+                        buffer[bytes_read] = '\0';
+                        fclose(file);
+                        printf("Retrieved cached file %s for hostname %s (%ld bytes)\n", 
+                               file_name, hostname, file_size);
+                        return buffer;
+                    }
                 }
                 fclose(file);
             }
@@ -396,7 +412,7 @@ int prefetch_and_cache(req_info *request_info, char *url) {
     response_buffer[bytes_read] = '\0';
     close(server_sock);
     
-    cache_file(request_info->hostname, url, response_buffer);
+    cache_file(request_info->hostname, url, response_buffer, bytes_read);
     return 0;
 }
 
@@ -558,17 +574,20 @@ int handle_request(int client_socket, struct sockaddr_in *client_addr) {
         }
         
         if (total_size > 0) {
-            full_response[total_size] = '\0';
-            cache_file(request_info.hostname, request_info.f_path, full_response);
+            cache_file(request_info.hostname, request_info.f_path, full_response, total_size);
             
-            // Fork for prefetching
+            // Fork for prefetching - do this BEFORE closing anything
             pid_t pid = fork();
             if (pid == 0) {
+                // Child process for prefetching
+                // Don't use client_socket here - it belongs to parent
                 parse_response(full_response, &request_info);
                 free(full_response);
-                close(server_sock);
                 exit(0);
+            } else if (pid < 0) {
+                perror("Fork failed for prefetching");
             }
+            // Parent continues normally
         }
         
         free(full_response);
