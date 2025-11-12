@@ -200,9 +200,14 @@ int find_free_entry() {
     return -1;
 }
 
-int cache_file(char *hostname, char *file_path, char *contents, size_t content_size) {
+int cache_file(char *hostname, char *file_path, char *contents, size_t content_size, int add_slash) {
     char hostpath[512]; 
-    snprintf(hostpath, sizeof(hostpath), "%s/%s", hostname, file_path);
+    if (add_slash) {
+        snprintf(hostpath, sizeof(hostpath), "%s/%s", hostname, file_path);
+    } else {
+        snprintf(hostpath, sizeof(hostpath), "%s%s", hostname, file_path);
+    }
+
     printf("Caching file for hostpath: %s (size: %zu bytes)\n", hostpath, content_size);
     uint64_t key = generate_key(hostpath);
     int index = key % HASH_TABLE;
@@ -414,7 +419,7 @@ int prefetch_and_cache_file(req_info *request_info, char *url, char *file_path) 
     response_buffer[bytes_read] = '\0';
     close(server_sock);
     
-    cache_file(request_info->hostname, file_path, response_buffer, bytes_read);
+    cache_file(request_info->hostname, file_path, response_buffer, bytes_read, 1);
     return 0;
 }
 
@@ -581,7 +586,7 @@ int handle_request(int client_socket, struct sockaddr_in *client_addr) {
         }
         
         if (total_size > 0) {
-            cache_file(request_info.hostname, request_info.f_path, full_response, total_size);
+            cache_file(request_info.hostname, request_info.f_path, full_response, total_size, 0);
             
             // Fork for prefetching - do this BEFORE closing anything
             pid_t pid = fork();
