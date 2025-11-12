@@ -440,7 +440,7 @@ int parse_response(char *response, req_info *request_info) {
         ptr += 6;
         char url[512];
         if (sscanf(ptr, "%511[^\"]", url) == 1) {
-            if (strncmp(url, "http://", 7) != 0) {
+            if (strncmp(url, "http://", 7) != 0 || strncmp(url, "https://", 8) != 0) {
                 printf("Prefetching relative URL: %s/%s\n", hostname, url);
                 char full_url[512];
                 snprintf(full_url, sizeof(full_url), "http://%s/%s", hostname, url);
