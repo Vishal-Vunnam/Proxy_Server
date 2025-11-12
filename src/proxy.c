@@ -752,7 +752,13 @@ int main(int argc, char **argv) {
     init_blocked_list();
 
     while (1) {
-        int curr_client = client_count;
+        int curr_client = atomic_fetch_add(&client_count, 1);
+        if (curr_client >= MAX_CONNECTIONS) {
+            printf("Maximum client connections reached. Rejecting new connection.\n");
+            atomic_fetch_sub(&client_count, 1);
+            sleep(1);
+            continue;
+        }
         socklen_t clientlen = sizeof(clients[curr_client].client_addr);
         clients[curr_client].client_socket =
             accept(sockfd, (struct sockaddr *)&clients[curr_client].client_addr, &clientlen);
@@ -781,7 +787,8 @@ int main(int argc, char **argv) {
             exit(0);
         } else { // parent
             close(clients[curr_client].client_socket);
-            client_count++;
+
+            // client_count++;
         }
     }
 
