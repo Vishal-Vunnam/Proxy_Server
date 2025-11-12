@@ -361,7 +361,8 @@ int check_cache(char *hostname, char *file_path) {
 }
 
 // Prefetch Functions
-int prefetch_and_cache_file(req_info *request_info, char *url) {
+int prefetch_and_cache_file(req_info *request_info, char *url, char *file_path) {
+    char full_url [512];
     printf("Prefetching URL: %s\n", url);
     
     int server_sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -413,7 +414,7 @@ int prefetch_and_cache_file(req_info *request_info, char *url) {
     response_buffer[bytes_read] = '\0';
     close(server_sock);
     
-    cache_file(request_info->hostname, url, response_buffer, bytes_read);
+    cache_file(request_info->hostname, file_path, response_buffer, bytes_read);
     return 0;
 }
 
@@ -426,10 +427,10 @@ int parse_response(char *response, req_info *request_info) {
         char url[512];
         if (sscanf(ptr, "%511[^\"]", url) == 1) {
             if (strncmp(url, "http://", 7) != 0) {
-                printf("Prefetching relative URL: %s%s\n", hostname, url);
+                printf("Prefetching relative URL: %s/%s\n", hostname, url);
                 char full_url[512];
-                snprintf(full_url, sizeof(full_url), "http://%s%s", hostname, url);
-                prefetch_and_cache_file(request_info, full_url);
+                snprintf(full_url, sizeof(full_url), "http://%s/%s", hostname, url);
+                prefetch_and_cache_file(request_info, full_url, url);
             }
             else {
                 printf("Prefetching absolute URL: %s\n", url);
