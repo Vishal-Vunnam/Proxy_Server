@@ -92,7 +92,7 @@ def run_make():
     env["CFLAGS"] = (env.get("CFLAGS", "") + " -w").strip()
 
     try:
-        subprocess.run(["make", "-s"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env=env, check=True)
+        subprocess.run(["make", "mac", "-s"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env=env, check=True)
         print("✔ Build completed.")
     except subprocess.CalledProcessError:
         print("✖ Build failed. (Compilation error even with warnings suppressed.)")

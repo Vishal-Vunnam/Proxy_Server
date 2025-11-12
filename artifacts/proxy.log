@@ -1,9 +1,13 @@
+Shared cache initialized with timeout: 20 seconds
 Proxy server listening on port 8000
-Accepted connection from 127.0.0.1:50058
+Cache timeout: 20 seconds
+Accepted connection from 127.0.0.1:39174
 Client closed connection
+Shared cache initialized with timeout: 20 seconds
 Proxy server listening on port 8000
-Accepted connection from 127.0.0.1:50058
-Accepted connection from 127.0.0.1:50074
+Cache timeout: 20 seconds
+Accepted connection from 127.0.0.1:39174
+Accepted connection from 127.0.0.1:39182
 
 --- Received Request ---
 GET http://netsys.cs.colorado.edu/index.html HTTP/1.1
@@ -19,15 +23,17 @@ Parsed Request:
  Path: /index.html
  Port: 80
 
-Cache miss for host netsys.cs.colorado.edu
+Cache miss for host netsys.cs.colorado.edu/index.html
 Forwarding request to netsys.cs.colorado.edu:80/index.html
-Sending response 200 with body length 3629 to client 127.0.0.1:50074
-Cached file ./cache/11568527786186489025 for hostname netsys.cs.colorado.edu
+Sending response 200 with body length 3629 to client 127.0.0.1:39182
+Cached file ./cache/5386361457465645535 for hostpath netsys.cs.colorado.edu/index.html (key: 5386361457465645535)
 Blocked access to host: www.google.com
+Shared cache initialized with timeout: 20 seconds
 Proxy server listening on port 8000
-Accepted connection from 127.0.0.1:50058
-Accepted connection from 127.0.0.1:50074
-Accepted connection from 127.0.0.1:50082
+Cache timeout: 20 seconds
+Accepted connection from 127.0.0.1:39174
+Accepted connection from 127.0.0.1:39182
+Accepted connection from 127.0.0.1:39196
 
 --- Received Request ---
 GET http://www.google.com/index.html HTTP/1.1
@@ -39,15 +45,17 @@ User-Agent: grading-script
 -------------------------
 Request Method: GET, URL: http://www.google.com/index.html, Version: HTTP/1.1
 Hostname www.google.com is blocked
-Sending response 403 with body length 44 to client 127.0.0.1:50082
+Sending response 403 with body length 44 to client 127.0.0.1:39196
 Invalid or unsupported request format.
-Sending response 400 with body length 39 to client 127.0.0.1:50082
+Sending response 400 with body length 39 to client 127.0.0.1:39196
 Blocked access to host: mail.yahoo.com
+Shared cache initialized with timeout: 20 seconds
 Proxy server listening on port 8000
-Accepted connection from 127.0.0.1:50058
-Accepted connection from 127.0.0.1:50074
-Accepted connection from 127.0.0.1:50082
-Accepted connection from 127.0.0.1:50090
+Cache timeout: 20 seconds
+Accepted connection from 127.0.0.1:39174
+Accepted connection from 127.0.0.1:39182
+Accepted connection from 127.0.0.1:39196
+Accepted connection from 127.0.0.1:39210
 
 --- Received Request ---
 GET http://mail.yahoo.com/index.html HTTP/1.1
@@ -59,16 +67,18 @@ User-Agent: grading-script
 -------------------------
 Request Method: GET, URL: http://mail.yahoo.com/index.html, Version: HTTP/1.1
 Hostname mail.yahoo.com is blocked
-Sending response 403 with body length 44 to client 127.0.0.1:50090
+Sending response 403 with body length 44 to client 127.0.0.1:39210
 Invalid or unsupported request format.
-Sending response 400 with body length 39 to client 127.0.0.1:50090
+Sending response 400 with body length 39 to client 127.0.0.1:39210
 Blocked access to host: 157.240.28.35
+Shared cache initialized with timeout: 20 seconds
 Proxy server listening on port 8000
-Accepted connection from 127.0.0.1:50058
-Accepted connection from 127.0.0.1:50074
-Accepted connection from 127.0.0.1:50082
-Accepted connection from 127.0.0.1:50090
-Accepted connection from 127.0.0.1:50098
+Cache timeout: 20 seconds
+Accepted connection from 127.0.0.1:39174
+Accepted connection from 127.0.0.1:39182
+Accepted connection from 127.0.0.1:39196
+Accepted connection from 127.0.0.1:39210
+Accepted connection from 127.0.0.1:39222
 
 --- Received Request ---
 GET http://157.240.28.35/index.html HTTP/1.1
@@ -80,17 +90,18 @@ User-Agent: grading-script
 -------------------------
 Request Method: GET, URL: http://157.240.28.35/index.html, Version: HTTP/1.1
 Hostname 157.240.28.35 is blocked
-Sending response 403 with body length 44 to client 127.0.0.1:50098
+Sending response 403 with body length 44 to client 127.0.0.1:39222
 Invalid or unsupported request format.
-Sending response 400 with body length 39 to client 127.0.0.1:50098
-Connection to target server failed: Connection refused
+Sending response 400 with body length 39 to client 127.0.0.1:39222
+Shared cache initialized with timeout: 20 seconds
 Proxy server listening on port 8000
-Accepted connection from 127.0.0.1:50058
-Accepted connection from 127.0.0.1:50074
-Accepted connection from 127.0.0.1:50082
-Accepted connection from 127.0.0.1:50090
-Accepted connection from 127.0.0.1:50098
-Accepted connection from 127.0.0.1:50106
+Cache timeout: 20 seconds
+Accepted connection from 127.0.0.1:39174
+Accepted connection from 127.0.0.1:39182
+Accepted connection from 127.0.0.1:39196
+Accepted connection from 127.0.0.1:39210
+Accepted connection from 127.0.0.1:39222
+Accepted connection from 127.0.0.1:39236
 
 --- Received Request ---
 GET http://netsys.cs.colorado.edu/index.html HTTP/1.1
@@ -106,5 +117,65 @@ Parsed Request:
  Path: /index.html
  Port: 80
 
-Cache miss for host netsys.cs.colorado.edu
+Cache hit for host netsys.cs.colorado.edu/index.html
+Retrieved cached file ./cache/5386361457465645535 for hostname netsys.cs.colorado.edu
+Sending response 200 with body length 3629 to client 127.0.0.1:39236
+Shared cache initialized with timeout: 20 seconds
+Proxy server listening on port 8000
+Cache timeout: 20 seconds
+Accepted connection from 127.0.0.1:39174
+Accepted connection from 127.0.0.1:39182
+Accepted connection from 127.0.0.1:39196
+Accepted connection from 127.0.0.1:39210
+Accepted connection from 127.0.0.1:39222
+Accepted connection from 127.0.0.1:39236
+Accepted connection from 127.0.0.1:56826
+
+--- Received Request ---
+GET http://netsys.cs.colorado.edu/index.html HTTP/1.1
+Accept-Encoding: identity
+Host: netsys.cs.colorado.edu
+Connection: close
+
+
+-------------------------
+Request Method: GET, URL: http://netsys.cs.colorado.edu/index.html, Version: HTTP/1.1
+Parsed Request:
+ Host: netsys.cs.colorado.edu
+ Path: /index.html
+ Port: 80
+
+Cache miss for host netsys.cs.colorado.edu/index.html
 Forwarding request to netsys.cs.colorado.edu:80/index.html
+Sending response 200 with body length 1448 to client 127.0.0.1:56826
+Sending response 200 with body length 2181 to client 127.0.0.1:56826
+File for hostname netsys.cs.colorado.edu is already cached
+Connection to target server failed: Connection refused
+Shared cache initialized with timeout: 20 seconds
+Proxy server listening on port 8000
+Cache timeout: 20 seconds
+Accepted connection from 127.0.0.1:39174
+Accepted connection from 127.0.0.1:39182
+Accepted connection from 127.0.0.1:39196
+Accepted connection from 127.0.0.1:39210
+Accepted connection from 127.0.0.1:39222
+Accepted connection from 127.0.0.1:39236
+Accepted connection from 127.0.0.1:56826
+Accepted connection from 127.0.0.1:56838
+
+--- Received Request ---
+GET http://netsys.cs.colorado.edu/files/text1.txt HTTP/1.1
+Accept-Encoding: identity
+Host: netsys.cs.colorado.edu
+Connection: close
+
+
+-------------------------
+Request Method: GET, URL: http://netsys.cs.colorado.edu/files/text1.txt, Version: HTTP/1.1
+Parsed Request:
+ Host: netsys.cs.colorado.edu
+ Path: /files/text1.txt
+ Port: 80
+
+Cache miss for host netsys.cs.colorado.edu/files/text1.txt
+Forwarding request to netsys.cs.colorado.edu:80/files/text1.txt
