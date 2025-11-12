@@ -17,8 +17,8 @@
 #include <stdatomic.h>
 #include <openssl/md5.h>
 #include <sys/wait.h>
-#include <sys/mman.h>  // For shared memory
-#include <semaphore.h>  // For semaphores
+#include <sys/mman.h>
+#include <semaphore.h>
 
 #define BUFFER_SIZE 8192
 #define MAX_CONNECTIONS 100
@@ -26,19 +26,11 @@
 #define HASH_TABLE 256
 #define CACHE_DIR "./cache/"
 
-typedef struct { 
-    int client_socket;
-    struct sockaddr_in client_addr;
-} client_info_t;
-
 typedef struct {
     int portno; 
     char hostname[256];
     char f_path[512]; 
 } req_info; 
-
-client_info_t clients[MAX_CONNECTIONS];
-atomic_int client_count = 0;
 
 char blocked_hosts[100][256];
 
@@ -46,25 +38,21 @@ typedef struct cache_entry_t {
     uint64_t key; 
     char file_path[512];
     time_t timestamp;
-    int next_index;  // Changed from pointer to index for shared memory
-    int in_use;      // Flag to indicate if this entry is active
+    int next_index;
+    int in_use;
 } cache_entry_t; 
 
-// Shared memory structures
 typedef struct {
-    int hash_table[HASH_TABLE];  // Indices into cache_entries array (-1 = empty)
-    cache_entry_t cache_entries[MAX_CONNECTIONS * 10];  // Pool of cache entries
+    int hash_table[HASH_TABLE];
+    cache_entry_t cache_entries[MAX_CONNECTIONS * 10];
     int cached_count;
     int cache_timeout;
-    sem_t cache_lock;  // Semaphore for synchronization
+    sem_t cache_lock;
 } shared_cache_t;
 
 shared_cache_t *shared_cache = NULL;
 
 // SIG Functions
-//---------------------------------------------
-
-
 volatile sig_atomic_t running = 1;
 
 void sigchld_handler(int signo) {
@@ -74,28 +62,18 @@ void sigchld_handler(int signo) {
 
 void sigint_handler(int signo) {
     (void)signo;
-    // printf("\n[!] Caught SIGINT/SIGTERM — shutting down proxy server...\n");
-
-    for (int i = 0; i < client_count; i++) {
-        if (clients[i].client_socket > 0)
-            close(clients[i].client_socket);
-    }
-
-    // Cleanup shared memory
+    
     if (shared_cache) {
         sem_destroy(&shared_cache->cache_lock);
         munmap(shared_cache, sizeof(shared_cache_t));
     }
 
-    while(waitpid(-1, NULL, WNOHANG) > 0); // Reap any remaining child processes
-
+    while(waitpid(-1, NULL, WNOHANG) > 0);
     kill(0, SIGTERM);
     running = 0;
 }
 
-// Initialize shared memory for cache
 int init_shared_cache(int timeout) {
-    // Create shared memory region
     shared_cache = mmap(NULL, sizeof(shared_cache_t),
                         PROT_READ | PROT_WRITE,
                         MAP_SHARED | MAP_ANONYMOUS, -1, 0);
@@ -105,11 +83,10 @@ int init_shared_cache(int timeout) {
         return -1;
     }
 
-    // Initialize the cache structure
     memset(shared_cache, 0, sizeof(shared_cache_t));
     
     for (int i = 0; i < HASH_TABLE; i++) {
-        shared_cache->hash_table[i] = -1;  // -1 means empty
+        shared_cache->hash_table[i] = -1;
     }
     
     for (int i = 0; i < MAX_CONNECTIONS * 10; i++) {
@@ -120,8 +97,7 @@ int init_shared_cache(int timeout) {
     shared_cache->cached_count = 0;
     shared_cache->cache_timeout = timeout;
     
-    // Initialize semaphore for process-safe access
-    if (sem_init(&shared_cache->cache_lock, 1, 1) < 0) {  // 1 = shared between processes
+    if (sem_init(&shared_cache->cache_lock, 1, 1) < 0) {
         perror("sem_init failed");
         munmap(shared_cache, sizeof(shared_cache_t));
         return -1;
@@ -132,8 +108,6 @@ int init_shared_cache(int timeout) {
 }
 
 // INIT Functions
-//---------------------------------------------
-
 int init_blocked_list() { 
     FILE *file = fopen("blocklist", "r");
     if (file == NULL) {
@@ -150,9 +124,8 @@ int init_blocked_list() {
 }
 
 // Sender Functions
-//---------------------------------------------
-
-int send_error(char *msg_body, int msg_len, int res_num, int client_ptr){ 
+int send_error(char *msg_body, int msg_len, int res_num, int client_socket, 
+               struct sockaddr_in *client_addr) { 
     char send_buffer[BUFFER_SIZE];
     memset(send_buffer, 0, sizeof(send_buffer));
     snprintf(send_buffer, sizeof(send_buffer),
@@ -162,16 +135,15 @@ int send_error(char *msg_body, int msg_len, int res_num, int client_ptr){
              "\r\n",
              res_num, msg_len);
 
-    client_info_t *client = &clients[client_ptr];
-    printf("Sending response %d with body length %d to client %s:%d\n", res_num, msg_len,
-           inet_ntoa(client->client_addr.sin_addr), ntohs(client->client_addr.sin_port));
+    printf("Sending error %d to client %s:%d\n", res_num,
+           inet_ntoa(client_addr->sin_addr), ntohs(client_addr->sin_port));
     
-    ssize_t bytes_sent = send(client->client_socket, send_buffer, strlen(send_buffer), 0);
+    ssize_t bytes_sent = send(client_socket, send_buffer, strlen(send_buffer), 0);
     if (bytes_sent < 0) {
         perror("Send error");
         return -1;
     }
-    bytes_sent = send(client->client_socket, msg_body, msg_len, 0);
+    bytes_sent = send(client_socket, msg_body, msg_len, 0);
     if (bytes_sent < 0) {
         perror("Send error");
         return -1;
@@ -179,12 +151,12 @@ int send_error(char *msg_body, int msg_len, int res_num, int client_ptr){
     return 0; 
 }
 
-int send_response(char *msg_body, int msg_len, int res_num, int client_ptr) { 
-    client_info_t *client = &clients[client_ptr];
-    printf("Sending response %d with body length %d to client %s:%d\n", res_num, msg_len,
-           inet_ntoa(client->client_addr.sin_addr), ntohs(client->client_addr.sin_port));
+int send_response(char *msg_body, int msg_len, int client_socket,
+                  struct sockaddr_in *client_addr) { 
+    printf("Sending response with body length %d to client %s:%d\n", msg_len,
+           inet_ntoa(client_addr->sin_addr), ntohs(client_addr->sin_port));
     
-    ssize_t bytes_sent = send(client->client_socket, msg_body, msg_len, 0);
+    ssize_t bytes_sent = send(client_socket, msg_body, msg_len, 0);
     if (bytes_sent < 0) {
         perror("Send error");
         return -1;
@@ -193,7 +165,6 @@ int send_response(char *msg_body, int msg_len, int res_num, int client_ptr) {
 }
 
 // Helper Functions
-
 int check_blocked(char *hostname) { 
     for (int i = 0; i < 100; i++) {
         if (strcmp(blocked_hosts[i], "") == 0) {
@@ -207,9 +178,7 @@ int check_blocked(char *hostname) {
     return 0; 
 }
 
-// Cache Functions with Shared Memory
-//---------------------------------------------
-
+// Cache Functions
 uint64_t generate_key(char *hostpath) {
     unsigned char digest[MD5_DIGEST_LENGTH];
     MD5((unsigned char*)hostpath, strlen(hostpath), digest);
@@ -221,14 +190,13 @@ uint64_t generate_key(char *hostpath) {
     return key;
 }
 
-// Find a free cache entry slot
 int find_free_entry() {
     for (int i = 0; i < MAX_CONNECTIONS * 10; i++) {
         if (!shared_cache->cache_entries[i].in_use) {
             return i;
         }
     }
-    return -1;  // No free slots
+    return -1;
 }
 
 int cache_file(char *hostname, char *file_path, char *contents) {
@@ -237,10 +205,8 @@ int cache_file(char *hostname, char *file_path, char *contents) {
     uint64_t key = generate_key(hostpath);
     int index = key % HASH_TABLE;
 
-    // Lock the cache for thread-safe access
     sem_wait(&shared_cache->cache_lock);
 
-    // Check if already cached
     int entry_idx = shared_cache->hash_table[index];
     while (entry_idx != -1) {
         if (shared_cache->cache_entries[entry_idx].key == key) {
@@ -251,7 +217,6 @@ int cache_file(char *hostname, char *file_path, char *contents) {
         entry_idx = shared_cache->cache_entries[entry_idx].next_index;
     }
 
-    // Find free entry slot
     int new_idx = find_free_entry();
     if (new_idx == -1) {
         sem_post(&shared_cache->cache_lock);
@@ -259,7 +224,6 @@ int cache_file(char *hostname, char *file_path, char *contents) {
         return -1;
     }
 
-    // Initialize new entry
     shared_cache->cache_entries[new_idx].key = key;
     strncpy(shared_cache->cache_entries[new_idx].file_path, file_path, 512);
     shared_cache->cache_entries[new_idx].timestamp = time(NULL);
@@ -270,7 +234,6 @@ int cache_file(char *hostname, char *file_path, char *contents) {
 
     sem_post(&shared_cache->cache_lock);
 
-    // Write to file (outside the lock for performance)
     char file_name[64];
     snprintf(file_name, sizeof(file_name), CACHE_DIR "%lu", key);
     FILE *file = fopen(file_name, "w"); 
@@ -286,48 +249,6 @@ int cache_file(char *hostname, char *file_path, char *contents) {
     return 0;
 }
 
-int delete_cache_file(char *hostname, char *file_path) { 
-    char hostpath[512];
-    snprintf(hostpath, sizeof(hostpath), "%s%s", hostname, file_path);
-    uint64_t key = generate_key(hostpath);
-    int index = key % HASH_TABLE;
-
-    sem_wait(&shared_cache->cache_lock);
-    
-    int entry_idx = shared_cache->hash_table[index];
-    int prev_idx = -1;
-    
-    while (entry_idx != -1) {
-        cache_entry_t *entry = &shared_cache->cache_entries[entry_idx];
-        if (entry->key == key && entry->in_use) {
-            if (prev_idx == -1) {
-                shared_cache->hash_table[index] = entry->next_index;
-            } else {
-                shared_cache->cache_entries[prev_idx].next_index = entry->next_index;
-            }
-            entry->in_use = 0;  // Mark as free
-            shared_cache->cached_count--;
-            sem_post(&shared_cache->cache_lock);
-            
-            // Delete file
-            char file_name[64];
-            snprintf(file_name, sizeof(file_name), CACHE_DIR "%lu", key);
-            if (remove(file_name) == 0) {
-                printf("Deleted cached file %s for hostname %s\n", file_name, hostname);
-            } else {
-                perror("Failed to delete cache file");
-            }
-            return 0;
-        }
-        prev_idx = entry_idx;
-        entry_idx = entry->next_index;
-    }
-
-    sem_post(&shared_cache->cache_lock);
-    return -1;  // Not found
-}
-
-
 char *get_cached_file(char *hostname, char *file_path) { 
     if (shared_cache->cached_count == 0) {
         return NULL; 
@@ -341,19 +262,12 @@ char *get_cached_file(char *hostname, char *file_path) {
     sem_wait(&shared_cache->cache_lock);
 
     int entry_idx = shared_cache->hash_table[index];
+    
     while (entry_idx != -1) {
         cache_entry_t *entry = &shared_cache->cache_entries[entry_idx];
         if (entry->key == key && entry->in_use) {
-            if (difftime(time(NULL), entry->timestamp) > shared_cache->cache_timeout) {
-                printf("Cache entry for hostname %s has expired\n", hostname);
-                sem_post(&shared_cache->cache_lock);
-                delete_cache_file(hostname, file_path);
-                return NULL;
-            }
-            
             sem_post(&shared_cache->cache_lock);
             
-            // Read file outside the lock
             char file_name[64];
             snprintf(file_name, sizeof(file_name), CACHE_DIR "%lu", key);
             FILE *file = fopen(file_name, "r");
@@ -390,23 +304,38 @@ int check_cache(char *hostname, char *file_path) {
     sem_wait(&shared_cache->cache_lock);
 
     int entry_idx = shared_cache->hash_table[index];
+    int prev_idx = -1;
     time_t now = time(NULL);
     
     while (entry_idx != -1) {
         cache_entry_t *entry = &shared_cache->cache_entries[entry_idx];
-            if (entry->key == key && entry->in_use) {
-                printf("Timestamp now: %ld, entry timestamp: %ld, timeout: %d\n",
-                       now, entry->timestamp, shared_cache->cache_timeout);
-                if (difftime(now, entry->timestamp) <= shared_cache->cache_timeout) {
-                    sem_post(&shared_cache->cache_lock);
-                    return 1;
+        if (entry->key == key && entry->in_use) {
+            if (difftime(now, entry->timestamp) <= shared_cache->cache_timeout) {
+                sem_post(&shared_cache->cache_lock);
+                return 1;
+            } else {
+                printf("Cache entry for %s%s has expired (age: %.0f sec, timeout: %d sec)\n", 
+                       hostname, file_path, difftime(now, entry->timestamp), 
+                       shared_cache->cache_timeout);
+                
+                if (prev_idx == -1) {
+                    shared_cache->hash_table[index] = entry->next_index;
                 } else {
-                    // Cache expired
-                    printf("Cache entry for hostname %s has expired\n", hostname);
-                    sem_post(&shared_cache->cache_lock);
-                    return -1;
+                    shared_cache->cache_entries[prev_idx].next_index = entry->next_index;
                 }
+                entry->in_use = 0;
+                shared_cache->cached_count--;
+                
+                sem_post(&shared_cache->cache_lock);
+                
+                char file_name[64];
+                snprintf(file_name, sizeof(file_name), CACHE_DIR "%lu", key);
+                remove(file_name);
+                
+                return 0;
             }
+        }
+        prev_idx = entry_idx;
         entry_idx = entry->next_index;
     }
 
@@ -414,14 +343,10 @@ int check_cache(char *hostname, char *file_path) {
     return 0;
 }
 
-
 // Prefetch Functions
-//---------------------------------------------
-int prefetch_and_cache(req_info *request_info, char *url, int client_ptr) {
-    // Simplified prefetch function
+int prefetch_and_cache(req_info *request_info, char *url) {
     printf("Prefetching URL: %s\n", url);
-    printf("Forwarding request to %s:%d%s\n",
-        request_info->hostname, request_info->portno, request_info->f_path);
+    
     int server_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (server_sock < 0) {
         perror("Socket creation failed");
@@ -434,6 +359,7 @@ int prefetch_and_cache(req_info *request_info, char *url, int client_ptr) {
         close(server_sock);
         return -1;
     }
+    
     struct sockaddr_in server_addr;
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
@@ -446,7 +372,6 @@ int prefetch_and_cache(req_info *request_info, char *url, int client_ptr) {
         return -1;
     }
 
-    // Send GET request
     char request_buffer[BUFFER_SIZE];
     snprintf(request_buffer, sizeof(request_buffer),
                 "GET %s HTTP/1.1\r\n"
@@ -461,7 +386,6 @@ int prefetch_and_cache(req_info *request_info, char *url, int client_ptr) {
         return -1;
     }
 
-    // Read response
     char response_buffer[BUFFER_SIZE];
     ssize_t bytes_read = read(server_sock, response_buffer, sizeof(response_buffer) - 1);
     if (bytes_read < 0) {
@@ -471,45 +395,32 @@ int prefetch_and_cache(req_info *request_info, char *url, int client_ptr) {
     }
     response_buffer[bytes_read] = '\0';
     close(server_sock);
+    
     cache_file(request_info->hostname, url, response_buffer);
-
     return 0;
 }
 
-
-
-
-int parse_response(char *response, int client_ptr, req_info *request_info) {
-    // Parse the response to find URLs to prefetch
-    // This is a simplified example; real parsing would be more complex
-    // Looking for "href" or "src" attributes in HTML
+int parse_response(char *response, req_info *request_info) {
     char *ptr = response;
     char *hostname = request_info->hostname;
+    
     while ((ptr = strstr(ptr, "href=\"")) != NULL) {
-        ptr += 6; // Move past 'href="'
+        ptr += 6;
         char url[512];
         if (sscanf(ptr, "%511[^\"]", url) == 1) {
-            printf("Found URL to prefetch: %s\n", url);
-            if (strncmp(url, "http://", 7) == 0) {}
-            else {
+            if (strncmp(url, "http://", 7) != 0) {
                 char full_url[512];
                 snprintf(full_url, sizeof(full_url), "http://%s%s", hostname, url);
-                printf("Prefetching URL: %s\n", full_url);
-                prefetch_and_cache(request_info, full_url, client_ptr);
+                prefetch_and_cache(request_info, full_url);
             }
         }
     }
-
     return 0;
 }
 
-
-
 // Request Handling Functions
-//---------------------------------------------
-
-
-int parse_request(char *request, req_info *info, int client_ptr) {
+int parse_request(char *request, req_info *info, int client_socket,
+                  struct sockaddr_in *client_addr) {
     char method[16], url[512], version[32];
     
     if (sscanf(request, "%15s %511s %31s", method, url, version) != 3)
@@ -533,7 +444,7 @@ int parse_request(char *request, req_info *info, int client_ptr) {
     if (strncmp(method, "GET", 3) != 0) {
         char msg_body[128];
         strcpy(msg_body, "Only GET requests are supported\n");
-        send_response(msg_body, strlen(msg_body), 404, client_ptr);
+        send_response(msg_body, strlen(msg_body), client_socket, client_addr);
         fprintf(stderr, "Only GET requests are supported\n");
         return -1;
     }
@@ -541,7 +452,7 @@ int parse_request(char *request, req_info *info, int client_ptr) {
     if (check_blocked(info->hostname)) {
         char msg_body[128];
         strcpy(msg_body, "Access to this host is blocked by the proxy\n");
-        send_error(msg_body, strlen(msg_body), 403, client_ptr);
+        send_error(msg_body, strlen(msg_body), 403, client_socket, client_addr);
         fprintf(stderr, "Blocked access to host: %s\n", info->hostname);
         return -1;
     }
@@ -550,9 +461,8 @@ int parse_request(char *request, req_info *info, int client_ptr) {
     return 0;
 }
 
-int handle_request(int client_ptr) {   
+int handle_request(int client_socket, struct sockaddr_in *client_addr) {   
     char buffer[BUFFER_SIZE] = {0};
-    int client_socket = clients[client_ptr].client_socket;
     ssize_t bytes_read = read(client_socket, buffer, sizeof(buffer) - 1);
 
     if (bytes_read == 0) {
@@ -567,7 +477,7 @@ int handle_request(int client_ptr) {
     printf("\n--- Received Request ---\n%s\n-------------------------\n", buffer);
 
     req_info request_info;
-    if (parse_request(buffer, &request_info, client_ptr) == 0) { 
+    if (parse_request(buffer, &request_info, client_socket, client_addr) == 0) { 
 
         printf("Parsed Request:\n Host: %s\n Path: %s\n Port: %d\n\n",
                request_info.hostname, request_info.f_path, request_info.portno);
@@ -577,7 +487,7 @@ int handle_request(int client_ptr) {
             printf("Cache hit for host %s%s\n", request_info.hostname, request_info.f_path);
             char *cached_content = get_cached_file(request_info.hostname, request_info.f_path);
             if (cached_content) {
-                send_response(cached_content, strlen(cached_content), 200, client_ptr);
+                send_response(cached_content, strlen(cached_content), client_socket, client_addr);
                 free(cached_content);
                 return 0;
             }
@@ -585,7 +495,6 @@ int handle_request(int client_ptr) {
             printf("Cache miss for host %s%s\n", request_info.hostname, request_info.f_path);
         }
 
-        // Forward request to target server
         printf("Forwarding request to %s:%d%s\n",
                request_info.hostname, request_info.portno, request_info.f_path);
 
@@ -614,7 +523,6 @@ int handle_request(int client_ptr) {
             return -1;
         }
         
-        // Send the original request to the target server
         ssize_t bytes_sent = send(server_sock, buffer, bytes_read, 0);
         if (bytes_sent < 0) {
             perror("Send to target server failed");
@@ -622,20 +530,18 @@ int handle_request(int client_ptr) {
             return -1;
         }
         
-        // Accumulate complete response before caching
         char *full_response = malloc(BUFFER_SIZE * 10);
         if (!full_response) {
             perror("Memory allocation failed");
             close(server_sock);
             return -1;
         }
-        // memset(full_response, 0, BUFFER_SIZE * 10);
+        
         size_t total_size = 0;
         size_t allocated_size = BUFFER_SIZE * 10;
         
         ssize_t resp_bytes;
         while ((resp_bytes = read(server_sock, buffer, sizeof(buffer))) > 0) {
-            // Expand buffer if needed
             if (total_size + resp_bytes > allocated_size) {
                 allocated_size *= 2;
                 full_response = realloc(full_response, allocated_size);
@@ -644,33 +550,27 @@ int handle_request(int client_ptr) {
             memcpy(full_response + total_size, buffer, resp_bytes);
             total_size += resp_bytes;
             
-            // Send chunk to client immediately
-            send_response(buffer, resp_bytes, 200, client_ptr);
+            send_response(buffer, resp_bytes, client_socket, client_addr);
         }
         
         if (resp_bytes < 0) {
             perror("Read from target server failed");
         }
         
-        // Cache the complete response
         if (total_size > 0) {
             full_response[total_size] = '\0';
             cache_file(request_info.hostname, request_info.f_path, full_response);
+            
+            // Fork for prefetching
+            pid_t pid = fork();
+            if (pid == 0) {
+                parse_response(full_response, &request_info);
+                free(full_response);
+                close(server_sock);
+                exit(0);
+            }
         }
         
-        // Fork and prefetch URLs
-        pid_t pid = fork();
-        if (pid == 0) { // child
-            parse_response(full_response, client_ptr, &request_info);
-            free(full_response);
-            close(server_sock);
-            exit(0);
-        }
-        else if (pid < 0) {
-            perror("Fork failed for prefetching");
-        }
-
-
         free(full_response);
         close(server_sock);
 
@@ -678,7 +578,7 @@ int handle_request(int client_ptr) {
         printf("Invalid or unsupported request format.\n");
         char msg_body[128];
         strcpy(msg_body, "Invalid or unsupported request format.\n");
-        send_response(msg_body, strlen(msg_body), 400, client_ptr);
+        send_response(msg_body, strlen(msg_body), client_socket, client_addr);
         return -1;
     }
 
@@ -686,8 +586,6 @@ int handle_request(int client_ptr) {
 }
 
 // Main Function
-//---------------------------------------------
-
 int main(int argc, char **argv) { 
     if (argc < 2) {
         fprintf(stderr, "usage: %s <port> [cache_timeout]\n", argv[0]); 
@@ -695,13 +593,12 @@ int main(int argc, char **argv) {
     }
 
     int portno = atoi(argv[1]);
-    int cache_timeout = 60;  // default
+    int cache_timeout = 60;
     
     if (argc >= 3) {
         cache_timeout = atoi(argv[2]); 
     }
 
-    // Initialize shared cache BEFORE forking
     if (init_shared_cache(cache_timeout) < 0) {
         fprintf(stderr, "Failed to initialize shared cache\n");
         exit(1);
@@ -719,7 +616,6 @@ int main(int argc, char **argv) {
     serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
     serveraddr.sin_port = htons(portno);
 
-    // Install SIGCHLD handler
     struct sigaction sa;
     sa.sa_handler = sigchld_handler;
     sigemptyset(&sa.sa_mask);
@@ -730,7 +626,6 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    // Install SIGINT + SIGTERM handler
     struct sigaction sa_int;
     sa_int.sa_handler = sigint_handler;
     sigemptyset(&sa_int.sa_mask);
@@ -758,50 +653,37 @@ int main(int argc, char **argv) {
     init_blocked_list();
 
     while (1) {
-        int curr_client = atomic_fetch_add(&client_count, 1);
-        if (curr_client >= MAX_CONNECTIONS) {
-            printf("Maximum client connections reached. Rejecting new connection.\n");
-            atomic_fetch_sub(&client_count, 1);
-            sleep(1);
-            continue;
-        }
-        socklen_t clientlen = sizeof(clients[curr_client].client_addr);
-        clients[curr_client].client_socket =
-            accept(sockfd, (struct sockaddr *)&clients[curr_client].client_addr, &clientlen);
+        struct sockaddr_in client_addr;
+        socklen_t clientlen = sizeof(client_addr);
+        int client_socket = accept(sockfd, (struct sockaddr *)&client_addr, &clientlen);
 
-        if (clients[curr_client].client_socket < 0) {
+        if (client_socket < 0) {
             perror("ERROR on accept");
             continue;
         }
 
         printf("Accepted connection from %s:%d\n",
-               inet_ntoa(clients[curr_client].client_addr.sin_addr),
-               ntohs(clients[curr_client].client_addr.sin_port));
+               inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 
         pid_t pid = fork();
         if (pid < 0) {
             if (errno == EINTR) continue; 
             perror("fork failed");
-            close(clients[curr_client].client_socket);
+            close(client_socket);
             continue;
         }
 
         if (pid == 0) { // child
             close(sockfd);
-            printf("Using current client index: %d\n", curr_client);
-            handle_request(curr_client);
-            close(clients[curr_client].client_socket);
+            handle_request(client_socket, &client_addr);
+            close(client_socket);
             exit(0);
         } else { // parent
-            close(clients[curr_client].client_socket);
-
-            // client_count++;
+            close(client_socket);
         }
     }
 
     close(sockfd);
-    
-    // Cleanup shared memory
     sem_destroy(&shared_cache->cache_lock);
     munmap(shared_cache, sizeof(shared_cache_t));
     
