@@ -434,7 +434,7 @@ int parse_response(char *response, req_info *request_info) {
             }
             else {
                 printf("Prefetching absolute URL: %s\n", url);
-                prefetch_and_cache_file(request_info, url);
+                // prefetch_and_cache_file(request_info, url, url + 7 + strlen(hostname));
             }
         }
     }
