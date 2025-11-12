@@ -62,6 +62,8 @@ typedef struct {
 shared_cache_t *shared_cache = NULL;
 
 // SIG Functions
+//---------------------------------------------
+
 
 volatile sig_atomic_t running = 1;
 
@@ -128,6 +130,7 @@ int init_shared_cache(int timeout) {
 }
 
 // INIT Functions
+//---------------------------------------------
 
 int init_blocked_list() { 
     FILE *file = fopen("blocklist", "r");
@@ -145,6 +148,7 @@ int init_blocked_list() {
 }
 
 // Sender Functions
+//---------------------------------------------
 
 int send_error(char *msg_body, int msg_len, int res_num, int client_ptr){ 
     char send_buffer[BUFFER_SIZE];
@@ -202,6 +206,7 @@ int check_blocked(char *hostname) {
 }
 
 // Cache Functions with Shared Memory
+//---------------------------------------------
 
 uint64_t generate_key(char *hostpath) {
     unsigned char digest[MD5_DIGEST_LENGTH];
@@ -279,6 +284,48 @@ int cache_file(char *hostname, char *file_path, char *contents) {
     return 0;
 }
 
+int delete_cache_file(char *hostname, char *file_path) { 
+    char hostpath[512];
+    snprintf(hostpath, sizeof(hostpath), "%s%s", hostname, file_path);
+    uint64_t key = generate_key(hostpath);
+    int index = key % HASH_TABLE;
+
+    sem_wait(&shared_cache->cache_lock);
+    
+    int entry_idx = shared_cache->hash_table[index];
+    int prev_idx = -1;
+    
+    while (entry_idx != -1) {
+        cache_entry_t *entry = &shared_cache->cache_entries[entry_idx];
+        if (entry->key == key && entry->in_use) {
+            if (prev_idx == -1) {
+                shared_cache->hash_table[index] = entry->next_index;
+            } else {
+                shared_cache->cache_entries[prev_idx].next_index = entry->next_index;
+            }
+            entry->in_use = 0;  // Mark as free
+            shared_cache->cached_count--;
+            sem_post(&shared_cache->cache_lock);
+            
+            // Delete file
+            char file_name[64];
+            snprintf(file_name, sizeof(file_name), CACHE_DIR "%lu", key);
+            if (remove(file_name) == 0) {
+                printf("Deleted cached file %s for hostname %s\n", file_name, hostname);
+            } else {
+                perror("Failed to delete cache file");
+            }
+            return 0;
+        }
+        prev_idx = entry_idx;
+        entry_idx = entry->next_index;
+    }
+
+    sem_post(&shared_cache->cache_lock);
+    return -1;  // Not found
+}
+
+
 char *get_cached_file(char *hostname, char *file_path) { 
     if (shared_cache->cached_count == 0) {
         return NULL; 
@@ -297,6 +344,7 @@ char *get_cached_file(char *hostname, char *file_path) {
         if (entry->key == key && entry->in_use) {
             if (difftime(time(NULL), entry->timestamp) > shared_cache->cache_timeout) {
                 printf("Cache entry for hostname %s has expired\n", hostname);
+                delete_cache_file(hostname, file_path);
                 sem_post(&shared_cache->cache_lock);
                 return NULL;
             }
@@ -362,6 +410,8 @@ int check_cache(char *hostname, char *file_path) {
 }
 
 // Request Handling Functions
+//---------------------------------------------
+
 
 int parse_request(char *request, req_info *info, int client_ptr) {
     char method[16], url[512], version[32];
@@ -521,6 +571,7 @@ int handle_request(int client_ptr) {
 }
 
 // Main Function
+//---------------------------------------------
 
 int main(int argc, char **argv) { 
     if (argc < 2) {
