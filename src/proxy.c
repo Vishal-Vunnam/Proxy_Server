@@ -788,6 +788,7 @@ int main(int argc, char **argv) {
 
         if (pid == 0) { // child
             close(sockfd);
+            printf("Using current client index: %d\n", curr_client);
             handle_request(curr_client);
             close(clients[curr_client].client_socket);
             exit(0);
