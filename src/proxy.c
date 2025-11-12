@@ -87,6 +87,8 @@ void sigint_handler(int signo) {
         munmap(shared_cache, sizeof(shared_cache_t));
     }
 
+    while(waitpid(-1, NULL, WNOHANG) > 0); // Reap any remaining child processes
+
     kill(0, SIGTERM);
     running = 0;
 }
