@@ -211,7 +211,7 @@ int cache_file(char *hostname, char *file_path, char *contents, size_t content_s
     // Check if already cached
     int entry_idx = shared_cache->hash_table[index];
     while (entry_idx != -1) {
-        if (shared_cache->cache_entries[entry_idx].key == key) {
+        if (shared_cache->cache_entries[entry_idx].key == key && strcmp(shared_cache->cache_entries[entry_idx].file_path, file_path) == 0) {
             sem_post(&shared_cache->cache_lock);
             printf("File for hostname %s is already cached\n", hostname);
             return 0;
