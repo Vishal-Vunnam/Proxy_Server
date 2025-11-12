@@ -428,9 +428,9 @@ int prefetch_and_cache(req_info *request_info, char *url, int client_ptr) {
         return -1;
     }
 
-    struct hostent *server = gethostbyname(hostname);
+    struct hostent *server = gethostbyname(request_info->hostname);
     if (server == NULL) {
-        fprintf(stderr, "No such host: %s\n", hostname);
+        fprintf(stderr, "No such host: %s\n", request_info->hostname);
         close(server_sock);
         return -1;
     }
@@ -664,7 +664,7 @@ int handle_request(int client_ptr) {
             perror("Fork failed for prefetching");
         }
 
-        
+
         free(full_response);
         close(server_sock);
 
