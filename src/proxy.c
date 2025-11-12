@@ -393,13 +393,15 @@ int check_cache(char *hostname, char *file_path) {
     while (entry_idx != -1) {
         cache_entry_t *entry = &shared_cache->cache_entries[entry_idx];
             if (entry->key == key && entry->in_use) {
+                printf("Timestamp now: %ld, entry timestamp: %ld, timeout: %d\n",
+                       now, entry->timestamp, shared_cache->cache_timeout);
                 if (difftime(now, entry->timestamp) <= shared_cache->cache_timeout) {
                     sem_post(&shared_cache->cache_lock);
-                    return -1;
+                    return 1;
                 } else {
                     // Cache expired
                     sem_post(&shared_cache->cache_lock);
-                    return 0;
+                    return -1;
                 }
             }
         entry_idx = entry->next_index;
