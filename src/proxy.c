@@ -218,10 +218,19 @@ int cache_file(char *hostname, char *file_path, char *contents, size_t content_s
     int entry_idx = shared_cache->hash_table[index];
     while (entry_idx != -1) {
         if (shared_cache->cache_entries[entry_idx].key == key && strcmp(shared_cache->cache_entries[entry_idx].file_path, file_path) == 0) {
-            sem_post(&shared_cache->cache_lock);
-            printf("File for hostname %s is already cached\n", hostname);
-            return 0;
+            if (difftime(time(NULL), shared_cache->cache_entries[entry_idx].timestamp) <= shared_cache->cache_timeout) {
+                sem_post(&shared_cache->cache_lock);
+                printf("File for hostname %s is already cached and valid\n", hostname);
+                return 0;
+            } else {
+                printf("Cache entry for %s has expired, updating...\n", hostpath);
+                break; // Proceed to update the cache
+            }
         }
+        //     sem_post(&shared_cache->cache_lock);
+        //     printf("File for hostname %s is already cached\n", hostname);
+        //     return 0;
+        // }
         entry_idx = shared_cache->cache_entries[entry_idx].next_index;
     }
 
