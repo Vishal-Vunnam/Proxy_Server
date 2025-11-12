@@ -624,6 +624,12 @@ int handle_request(int client_ptr) {
         
         // Accumulate complete response before caching
         char *full_response = malloc(BUFFER_SIZE * 10);
+        if (!full_response) {
+            perror("Memory allocation failed");
+            close(server_sock);
+            return -1;
+        }
+        // memset(full_response, 0, BUFFER_SIZE * 10);
         size_t total_size = 0;
         size_t allocated_size = BUFFER_SIZE * 10;
         
