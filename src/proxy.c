@@ -203,6 +203,7 @@ int find_free_entry() {
 int cache_file(char *hostname, char *file_path, char *contents, size_t content_size) {
     char hostpath[512]; 
     snprintf(hostpath, sizeof(hostpath), "%s%s", hostname, file_path);
+    printf("Caching file for hostpath: %s (size: %zu bytes)\n", hostpath, content_size);
     uint64_t key = generate_key(hostpath);
     int index = key % HASH_TABLE;
 
@@ -360,7 +361,7 @@ int check_cache(char *hostname, char *file_path) {
 }
 
 // Prefetch Functions
-int prefetch_and_cache(req_info *request_info, char *url) {
+int prefetch_and_cache_file(req_info *request_info, char *url) {
     printf("Prefetching URL: %s\n", url);
     
     int server_sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -425,9 +426,14 @@ int parse_response(char *response, req_info *request_info) {
         char url[512];
         if (sscanf(ptr, "%511[^\"]", url) == 1) {
             if (strncmp(url, "http://", 7) != 0) {
+                printf("Prefetching relative URL: %s%s\n", hostname, url);
                 char full_url[512];
                 snprintf(full_url, sizeof(full_url), "http://%s%s", hostname, url);
-                prefetch_and_cache(request_info, full_url);
+                prefetch_and_cache_file(request_info, full_url);
+            }
+            else {
+                printf("Prefetching absolute URL: %s\n", url);
+                prefetch_and_cache_file(request_info, url);
             }
         }
     }
