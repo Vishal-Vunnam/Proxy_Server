@@ -400,6 +400,7 @@ int check_cache(char *hostname, char *file_path) {
                     return 1;
                 } else {
                     // Cache expired
+                    printf("Cache entry for hostname %s has expired\n", hostname);
                     sem_post(&shared_cache->cache_lock);
                     return -1;
                 }
