@@ -593,6 +593,15 @@ int handle_request(int client_socket, struct sockaddr_in *client_addr) {
         if (resp_bytes < 0) {
             perror("Read from target server failed");
         }
+
+        if (total_size == 0) {
+            send_error("No response received from target server\n", 34, 502, client_socket, client_addr);
+            printf("No response received from target server\n");
+            free(full_response);
+            close(server_sock);
+            return -1;
+        }
+
         
         if (total_size > 0) {
             cache_file(request_info.hostname, request_info.f_path, full_response, total_size, 0);
