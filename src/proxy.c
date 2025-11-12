@@ -414,6 +414,97 @@ int check_cache(char *hostname, char *file_path) {
     return 0;
 }
 
+
+// Prefetch Functions
+//---------------------------------------------
+int prefetch_and_cache(req_info *request_info, char *url, int client_ptr) {
+    // Simplified prefetch function
+    printf("Prefetching URL: %s\n", url);
+    printf("Forwarding request to %s:%d%s\n",
+        request_info->hostname, request_info->portno, request_info->f_path);
+    int server_sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_sock < 0) {
+        perror("Socket creation failed");
+        return -1;
+    }
+
+    struct hostent *server = gethostbyname(hostname);
+    if (server == NULL) {
+        fprintf(stderr, "No such host: %s\n", hostname);
+        close(server_sock);
+        return -1;
+    }
+    struct sockaddr_in server_addr;
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    memcpy(&server_addr.sin_addr.s_addr, server->h_addr, server->h_length);
+    server_addr.sin_port = htons(80);
+
+    if (connect(server_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+        perror("Connection to target server failed");
+        close(server_sock);
+        return -1;
+    }
+
+    // Send GET request
+    char request_buffer[BUFFER_SIZE];
+    snprintf(request_buffer, sizeof(request_buffer),
+                "GET %s HTTP/1.1\r\n"
+                "Host: %s\r\n"
+                "Connection: close\r\n"
+                "\r\n",
+                url, request_info->hostname);
+
+    if (send(server_sock, request_buffer, strlen(request_buffer), 0) < 0) {
+        perror("Failed to send request");
+        close(server_sock);
+        return -1;
+    }
+
+    // Read response
+    char response_buffer[BUFFER_SIZE];
+    ssize_t bytes_read = read(server_sock, response_buffer, sizeof(response_buffer) - 1);
+    if (bytes_read < 0) {
+        perror("Failed to read response");
+        close(server_sock);
+        return -1;
+    }
+    response_buffer[bytes_read] = '\0';
+    close(server_sock);
+    cache_file(request_info->hostname, url, response_buffer);
+
+    return 0;
+}
+
+
+
+
+int parse_response(char *response, int client_ptr, req_info *request_info) {
+    // Parse the response to find URLs to prefetch
+    // This is a simplified example; real parsing would be more complex
+    // Looking for "href" or "src" attributes in HTML
+    char *ptr = response;
+    char *hostname = request_info->hostname;
+    while ((ptr = strstr(ptr, "href=\"")) != NULL) {
+        ptr += 6; // Move past 'href="'
+        char url[512];
+        if (sscanf(ptr, "%511[^\"]", url) == 1) {
+            printf("Found URL to prefetch: %s\n", url);
+            if (strncmp(url, "http://", 7) == 0) {}
+            else {
+                char full_url[512];
+                snprintf(full_url, sizeof(full_url), "http://%s%s", hostname, url);
+                printf("Prefetching URL: %s\n", full_url);
+                prefetch_and_cache(request_info, full_url, client_ptr);
+            }
+        }
+    }
+
+    return 0;
+}
+
+
+
 // Request Handling Functions
 //---------------------------------------------
 
@@ -560,6 +651,19 @@ int handle_request(int client_ptr) {
             full_response[total_size] = '\0';
             cache_file(request_info.hostname, request_info.f_path, full_response);
         }
+        
+        // Fork and prefetch URLs
+        pid_t pid = fork();
+        if (pid == 0) { // child
+            parse_response(full_response, client_ptr, &request_info);
+            free(full_response);
+            close(server_sock);
+            exit(0);
+        }
+        else if (pid < 0) {
+            perror("Fork failed for prefetching");
+        }
+
         
         free(full_response);
         close(server_sock);
